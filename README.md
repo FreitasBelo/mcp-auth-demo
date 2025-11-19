@@ -1,40 +1,24 @@
 # MCP Authentication Demo
 
-A production-ready **Model Context Protocol (MCP)** server with **OAuth 2.1 authentication** built using Next.js 15 and Google OAuth.
+A production-ready **Model Context Protocol (MCP)** server with **Clerk OAuth authentication** built using Next.js 15.
 
 ## 🎯 Status: Production Ready ✅
 
-**OAuth 2.1 Compliant** - Fully implements OAuth 2.1 authorization code flow with PKCE, removing deprecated implicit flow patterns.
+**Clerk OAuth Integration** - Fully implements MCP server authentication using Clerk's OAuth provider.
 
 ### Key Features
-- ✅ **OAuth 2.1 Authentication** - Secure Google OAuth with PKCE support
+- ✅ **Clerk OAuth Authentication** - Secure authentication with Clerk
+- ✅ **Dynamic Client Registration** - MCP client auto-registration support
+- ✅ **Standards Compliant** - OAuth Protected Resource Metadata (RFC 9728)
+- ✅ **Multiple Tools** - Includes user data retrieval and greeting tools
 - ✅ **VS Code Integration** - Seamless MCP authentication in VS Code
-- ✅ **MCP Remote Support** - Full compatibility with mcp-remote for both local and remote servers
-- ✅ **Security First** - No token exposure in URLs, proper error handling
-- ✅ **Standards Compliant** - RFC 9728 OAuth Protected Resource Metadata
-
-## 📋 Important Notice: mcp-remote Compatibility
-
-> **💡 TIP**: When using `mcp-remote` with remote servers, specify a unique port number (e.g., 59908) to avoid conflicts with other MCP servers. This server has been designed to handle both local and remote OAuth flows seamlessly.
->
-> **Technical Background**: This server resolves an architectural limitation in `mcp-remote`'s port detection by implementing intelligent redirect URI management that supports both OAuth 2.1 compliance and client compatibility requirements.
->
-> **Usage Examples**:
-> ```bash
-> # Local development (no port needed)
-> npx mcp-remote http://localhost:3000/api/mcp
-> 
-> # Remote server (specify unique port)
-> npx mcp-remote https://your-server.vercel.app/api/mcp 59908
-> ```
-
-See detailed analysis: [mcp-remote Port Detection Issue Analysis](./docs/mcp-remote-port-detection-issue.md)
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+
-- Google OAuth 2.0 credentials ([Setup Guide](https://developers.google.com/identity/protocols/oauth2))
+- Clerk account with OAuth application configured ([Setup Guide](https://clerk.com/docs))
+- Enable **Dynamic client registration** in Clerk Dashboard
 
 ### Installation
 ```bash
@@ -47,8 +31,8 @@ pnpm install
 ### Configuration
 Create `.env.local`:
 ```env
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
+CLERK_SECRET_KEY=your-clerk-secret-key
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key
 ```
 
 ### Development
@@ -88,49 +72,26 @@ npx mcp-remote https://mcp-auth-demo-rust.vercel.app/api/mcp
 ### Core Application Files
 
 #### **`app/api/[transport]/route.ts`**
-Main MCP endpoint with OAuth 2.1 authentication middleware. Handles all MCP protocol messages with bearer token validation.
-
-#### **`lib/auth.ts`**
-OAuth 2.1 authentication utilities:
-- Google ID token verification
-- User context extraction
-- Token validation functions
+Main MCP endpoint with Clerk OAuth authentication. Uses `@vercel/mcp-adapter` and `@clerk/mcp-tools` for secure MCP protocol handling.
 
 #### **`lib/hello.ts`**
-MCP tool implementation with authentication context. Demonstrates how to build authenticated MCP tools.
+MCP tool implementation with Clerk authentication context. Demonstrates how to build authenticated MCP tools with user information.
 
-### OAuth 2.1 Authentication System
+#### **`lib/clerk-user.ts`**
+Clerk user data retrieval tool. Fetches authenticated user information from Clerk.
 
-#### **`app/api/auth/authorize/route.ts`**
-OAuth 2.1 authorization endpoint with PKCE support. Initiates the authentication flow and redirects to Google OAuth.
-
-#### **`app/api/auth/token/route.ts`**
-OAuth 2.1 token endpoint for authorization code exchange. Handles PKCE verification and issues tokens.
-
-#### **`app/api/auth/callback/google/route.ts`**
-Google OAuth callback handler with client type detection:
-- VS Code Local (authorization code flow)
-- VS Code Web (protocol-specific parameters)
-- MCP Remote (oauth/callback pattern)
-
-#### **`app/api/auth/register/route.ts`**
-OAuth 2.0 Dynamic Client Registration endpoint (RFC 7591) with **mcp-remote compatibility fix**. Includes both server-domain and localhost redirect URIs to support mcp-remote's port detection mechanism while maintaining OAuth 2.1 compliance.
-
-### OAuth Discovery Endpoints
+### Clerk OAuth Metadata Endpoints
 
 #### **`app/.well-known/oauth-authorization-server/route.ts`**
-OAuth 2.1 Authorization Server Metadata (RFC 8414). Provides client discovery information for OAuth capabilities.
+OAuth Authorization Server Metadata endpoint using `authServerMetadataHandlerClerk` from `@clerk/mcp-tools`.
 
-#### **`app/.well-known/oauth-protected-resource/route.ts`**
-OAuth 2.1 Protected Resource Metadata (RFC 9728). Enables MCP clients to discover authentication requirements.
+#### **`app/.well-known/oauth-protected-resource/mcp/route.ts`**
+OAuth Protected Resource Metadata endpoint using `protectedResourceHandlerClerk` from `@clerk/mcp-tools`. Declares required OAuth scopes.
 
-### Additional Routes
+### Middleware
 
-#### **`app/oauth/callback/route.ts`**
-OAuth callback specifically for MCP Remote and Claude Desktop clients using the `/oauth/callback` pattern.
-
-#### **`app/actions/mcp-actions.ts`**
-Server actions for Next.js frontend to interact with MCP server (demo purposes).
+#### **`proxy.ts`**
+Clerk middleware configuration that allows public access to `.well-known` endpoints while protecting all other routes.
 
 ### Frontend Components
 
@@ -188,6 +149,20 @@ Development guidelines and architectural patterns for building MCP servers. [Vie
 
 ## 🛠️ Available MCP Tools
 
+### `get-clerk-user-data`
+Retrieves data about the authenticated Clerk user.
+
+**Parameters:** None
+
+**Example:**
+```bash
+# Via MCP client
+> call get-clerk-user-data {}
+```
+
+**Response:**
+Returns complete Clerk user object including ID, email, and profile information.
+
 ### `say_hello`
 Authenticated greeting tool that returns user context.
 
@@ -196,75 +171,68 @@ Authenticated greeting tool that returns user context.
 
 **Example:**
 ```bash
-# Via mcp-remote
-npx mcp-remote http://localhost:3000/api/mcp
+# Via MCP client
 > call say_hello {"name": "Alice"}
 ```
 
 **Response:**
 ```
-👋 Hello, Alice! (authenticated as user@gmail.com) This is an authenticated MCP tool!
+👋 Hello, Alice!
+
+Authenticated Clerk User:
+- User ID: user_xxx
+- Email: user@example.com
+
+This is an authenticated MCP tool powered by Clerk!
 ```
 
 ## 🔒 Security Features
 
-- **OAuth 2.1 Compliance** - Modern OAuth with mandatory PKCE
-- **No Token Exposure** - Authorization code flow prevents URL token leakage
-- **Google ID Token Verification** - Cryptographic signature validation
-- **Client Type Detection** - Automatic detection and appropriate flow selection
-- **Proper Error Handling** - OAuth 2.1 compliant error responses
-- **Stateless Architecture** - No session storage, scales horizontally
+- **Clerk OAuth** - Enterprise-grade authentication
+- **Dynamic Client Registration** - Automatic MCP client registration
+- **Token Verification** - Cryptographic validation via Clerk
+- **OAuth Metadata** - Standards-compliant discovery endpoints
+- **Protected Routes** - Middleware-based route protection
 
-## 📖 Related Documentation
+## 📖 Documentation
 
-- **[Authentication URL Patterns](./docs/authentication-url-patterns.md)** - Deep dive into OAuth flow patterns
-- **[OAuth 2.1 Compliance Plan](./docs/oauth-2.1-compliance-plan.md)** - Implementation strategy and security improvements
-- **[Development Guidelines](./agents.md)** - Best practices for MCP server development
+For complete MCP server implementation guide with Clerk, see:
+[Clerk MCP Documentation](https://clerk.com/docs/nextjs/guides/development/mcp/build-mcp-server)
 
 ## 🧪 Testing
 
-### Automated OAuth Flow
+### Testing with MCP Clients
 ```bash
-# Complete OAuth flow with browser authentication
-npx mcp-remote http://localhost:3000/api/mcp
+# Connect with MCP Inspector or compatible client
+# Configure your MCP client to use:
+# URL: http://localhost:3000/api/mcp
+# Authentication: OAuth (Clerk)
 ```
-
-### Manual HTTP Testing (requires valid token)
-```bash
-curl -X POST http://localhost:3000/api/mcp \
-  -H "Authorization: Bearer <google-id-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"say_hello","arguments":{"name":"Test"}}}'
-```
-
-### Development Tools
-- **MCP Remote**: Command-line MCP client with automatic OAuth handling
-- **VS Code Extension**: Interactive MCP development environment
 
 ## 🚀 Deployment
 
 This implementation is production-ready with:
-- Stateless authentication (no database required)
+
+- Clerk-managed authentication
+- Dynamic client registration
 - Horizontal scaling support
 - Comprehensive error handling
 - Security best practices
-- OAuth 2.1 compliance
 
 ### Environment Variables
+
 ```env
-GOOGLE_CLIENT_ID=your-client-id
-GOOGLE_CLIENT_SECRET=your-client-secret
-# Optional: Custom domain override (auto-detected in most cases)
-CUSTOM_DOMAIN=your-custom-domain.com
+CLERK_SECRET_KEY=your-clerk-secret-key
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key
 ```
 
-**Note**: URLs are automatically resolved using the intelligent url-resolver system that detects the appropriate domain based on environment (Vercel, localhost, etc.).
+### Clerk Dashboard Setup
 
-### Google OAuth Setup
-**Authorized Redirect URIs:**
-- `https://your-domain.com/api/auth/callback/google`
-- `http://localhost:3000/api/auth/callback/google` (development)
+1. Create a Clerk application
+2. Enable **OAuth Applications** in the dashboard
+3. Toggle on **Dynamic client registration**
+4. Configure your application domains
 
 ---
 
-**Built with ❤️ using Next.js 15, mcp-handler, and OAuth 2.1**
+Built with ❤️ using Next.js 15, @vercel/mcp-adapter, and Clerk

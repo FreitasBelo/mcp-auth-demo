@@ -1,6 +1,5 @@
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { z } from "zod";
-import { formatUserInfo } from "./auth";
 
 // Zod schema for hello message validation
 export const helloSchema = {
@@ -11,10 +10,10 @@ export const helloSchema = {
     .describe("The name of the person to greet"),
 };
 
-// Enhanced hello function with authentication support
+// Enhanced hello function with Clerk authentication support
 export function sayHello(
   { name }: { name?: string },
-  extra?: { authInfo?: AuthInfo },
+  extra?: { authInfo?: AuthInfo }
 ) {
   // Validate and get the name
   const validatedName = name || "World";
@@ -22,14 +21,20 @@ export function sayHello(
   // Basic greeting
   const greeting = `👋 Hello, ${validatedName}!`;
 
-  // Add authentication info if available
+  // Add Clerk authentication info if available
   const authInfo = extra?.authInfo;
-  const userInfo = formatUserInfo(authInfo);
+  let userInfo = "";
+
+  if (authInfo?.extra?.userId) {
+    const userId = authInfo.extra.userId as string;
+    const email = authInfo.extra.email as string | undefined;
+    userInfo = `\n\nAuthenticated Clerk User:\n- User ID: ${userId}${email ? `\n- Email: ${email}` : ""}`;
+  }
 
   // Generate message with auth context
   const message = authInfo
-    ? `${greeting}${userInfo} This is an authenticated MCP tool!`
-    : `${greeting} This is a public MCP tool!`;
+    ? `${greeting}${userInfo}\n\nThis is an authenticated MCP tool powered by Clerk!`
+    : `${greeting}\n\nThis is a public MCP tool!`;
 
   // Return MCP-compatible result format
   return {
@@ -45,6 +50,7 @@ export function sayHello(
 // Tool definition for MCP handler
 export const helloTool = {
   name: "say_hello",
-  description: "Says hello to someone with authentication info",
+  description: "Says hello to someone with Clerk authentication info",
   inputSchema: helloSchema,
 } as const;
+
