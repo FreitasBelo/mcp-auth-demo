@@ -53,3 +53,4 @@ const authHandler = withMcpAuth(
 console.log("✅ MCP Server initialized with Clerk OAuth authentication");
 
 export { authHandler as GET, authHandler as POST };
+
