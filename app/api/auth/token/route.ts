@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
+import { protectRequest } from "@/lib/arcjet";
 import type { AuthCodeData, GoogleTokens } from "../../../../lib/auth-types";
 import {
   buildTokenResponse,
@@ -20,6 +21,12 @@ import "../../../../lib/auth-types"; // Import shared types
  */
 export async function POST(request: NextRequest) {
   try {
+    try {
+      const check = await protectRequest(request);
+      if (!check.allowed) return new NextResponse("Blocked by Arcjet", { status: 403 });
+    } catch (e) {
+      console.error("Arcjet check failed for token endpoint:", e);
+    }
     const body = await request.text();
     const params = new URLSearchParams(body);
 
@@ -204,5 +211,11 @@ export async function POST(request: NextRequest) {
 
 // Handle preflight OPTIONS requests
 export async function OPTIONS(_request: NextRequest) {
+  try {
+    const check = await protectRequest(_request);
+    if (!check.allowed) return new NextResponse("Blocked by Arcjet", { status: 403 });
+  } catch (e) {
+    console.error("Arcjet check failed for OPTIONS token endpoint:", e);
+  }
   return createOPTIONSResponse(CORS_CONFIGS.oauth);
 }

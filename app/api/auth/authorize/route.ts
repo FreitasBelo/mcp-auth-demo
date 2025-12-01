@@ -1,5 +1,6 @@
 ﻿import { randomBytes } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
+import { protectRequest } from "@/lib/arcjet";
 import type { OAuth21AuthParams } from "../../../../lib/auth-types";
 import {
   CORS_CONFIGS,
@@ -11,10 +12,24 @@ import {
 import { resolveApiDomain } from "../../../../lib/url-resolver";
 
 export async function OPTIONS() {
+  try {
+    // OPTIONS may not have full request object; create a minimal Request
+    const fakeReq = new Request("http://localhost/");
+    const check = await protectRequest(fakeReq);
+    if (!check.allowed) return new Response("Blocked by Arcjet", { status: 403 });
+  } catch (e) {
+    console.error("Arcjet check failed for OPTIONS authorize endpoint:", e);
+  }
   return createOPTIONSResponse(CORS_CONFIGS.oauth);
 }
 
 export async function GET(request: NextRequest) {
+  try {
+    const check = await protectRequest(request);
+    if (!check.allowed) return createOAuth21ErrorRedirect(null, "access_denied", "Blocked by Arcjet", null);
+  } catch (e) {
+    console.error("Arcjet check failed for authorize GET:", e);
+  }
   const url = new URL(request.url);
   const searchParams = url.searchParams;
 

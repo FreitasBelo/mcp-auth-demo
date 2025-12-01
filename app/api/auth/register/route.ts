@@ -1,5 +1,6 @@
 import { CORS_CONFIGS, createOPTIONSResponse } from "@/lib/oauth-utils";
 import { resolveApiDomain } from "@/lib/url-resolver";
+import { protectRequest } from "@/lib/arcjet";
 
 /**
  * OAuth 2.0 Dynamic Client Registration endpoint (RFC 7591)
@@ -12,6 +13,14 @@ import { resolveApiDomain } from "@/lib/url-resolver";
  */
 
 export async function POST(req: Request) {
+  try {
+    try {
+      const check = await protectRequest(req);
+      if (!check.allowed) return new Response("Blocked by Arcjet", { status: 403 });
+    } catch (e) {
+      console.error("Arcjet check failed for register endpoint:", e);
+    }
+  } catch (_e) {}
   try {
     const registrationRequest = await req.json();
 
@@ -127,5 +136,11 @@ export async function POST(req: Request) {
 }
 
 export async function OPTIONS(_req: Request) {
+  try {
+    const check = await protectRequest(_req);
+    if (!check.allowed) return new Response("Blocked by Arcjet", { status: 403 });
+  } catch (e) {
+    console.error("Arcjet check failed for OPTIONS register endpoint:", e);
+  }
   return createOPTIONSResponse(CORS_CONFIGS.api);
 }

@@ -4,6 +4,7 @@ import { verifyClerkToken } from "@clerk/mcp-tools/next";
 import { createMcpHandler, withMcpAuth } from "@vercel/mcp-adapter";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { helloTool, sayHello } from "@/lib/hello";
+import { protectRequest } from "@/lib/arcjet";
 
 const clerk = await clerkClient();
 
@@ -52,5 +53,26 @@ const authHandler = withMcpAuth(
 
 console.log("✅ MCP Server initialized with Clerk OAuth authentication");
 
-export { authHandler as GET, authHandler as POST };
+// Wrap the authHandler with Arcjet protection where possible. If Arcjet
+// is disabled (no ARCJET_KEY), protectRequest will be a no-op.
+async function arcjetWrap(handler: (req: Request) => Promise<Response>) {
+  return async function (req: Request) {
+    try {
+      const check = await protectRequest(req);
+      if (!check.allowed) {
+        console.warn("Request blocked by Arcjet", check.decision || check);
+        return new Response("Blocked by Arcjet", { status: 403 });
+      }
+    } catch (err) {
+      console.error("Arcjet wrapper error:", err);
+    }
+
+    return handler(req);
+  };
+}
+
+const _exportGET = await arcjetWrap(authHandler as any);
+const _exportPOST = await arcjetWrap(authHandler as any);
+
+export { _exportGET as GET, _exportPOST as POST };
 

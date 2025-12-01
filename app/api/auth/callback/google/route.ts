@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { protectRequest } from "@/lib/arcjet";
 import {
   createOAuth21ErrorRedirect,
   createOAuth21ErrorResponse,
@@ -8,6 +9,13 @@ import "../../../../../lib/auth-types"; // Import shared types
 
 export async function GET(request: NextRequest) {
   console.log("🔥 OAUTH CALLBACK HIT 🔥 - ", new Date().toISOString());
+
+  try {
+    const check = await protectRequest(request);
+    if (!check.allowed) return createOAuth21ErrorResponse("access_denied", "Blocked by Arcjet");
+  } catch (e) {
+    console.error("Arcjet check failed for callback GET:", e);
+  }
 
   const url = new URL(request.url);
   const searchParams = url.searchParams;
@@ -450,6 +458,14 @@ export async function GET(request: NextRequest) {
 }
 export async function POST(request: NextRequest) {
   const body = await request.text();
+
+  try {
+    const check = await protectRequest(request);
+    if (!check.allowed)
+      return NextResponse.json({ message: "Blocked by Arcjet" }, { status: 403 });
+  } catch (e) {
+    console.error("Arcjet check failed for callback POST:", e);
+  }
 
   console.log("OAuth callback POST received:");
   console.log("URL:", request.url);
